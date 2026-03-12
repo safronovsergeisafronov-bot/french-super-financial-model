@@ -4,5 +4,9 @@
   },
   "preferences": {
     "teammateMode": "tmux"
+  },
+  "recording": {
+    "enabled": true,
+    "path": "./.claude/logs"
   }
 }

@@ -62,13 +62,14 @@ describe("Инвариант: isProfitable === (netProfit >= 0)", () => {
   });
 });
 
-describe("Инвариант: totalCost = managers + teachers + other", () => {
+describe("Инвариант: totalCost = managers + teachers + productsCost + other", () => {
   test("сумма слагаемых равна итогу", () => {
     for (let i = 0; i < RUNS; i++) {
       const p = randomParams();
       const r = calculateModel(p);
+      // products не передаётся → productsCost = 0, инвариант сохраняется
       expect(r.totalCost).toBe(
-        r.managerCostTotal + r.teacherCostTotal + p.otherCosts
+        r.managerCostTotal + r.teacherCostTotal + r.productsCost + p.otherCosts
       );
     }
   });
@@ -101,6 +102,65 @@ describe("Инвариант: breakeven > 0 и целое", () => {
       const r = calculateModel(randomParams());
       expect(r.breakeven).toBeGreaterThan(0);
       expect(Number.isInteger(r.breakeven)).toBe(true);
+    }
+  });
+});
+
+// ── Новые инварианты: teachers[] ─────────────────────────────────────────────
+
+function randomTeacher(id) {
+  return {
+    id: `t${id}`,
+    name: `Преп${id}`,
+    lessonsPerMonth: Math.floor(Math.random() * 100),
+    ratePerLesson: Math.floor(Math.random() * 30) + 5,
+    pricePerLesson: Math.floor(Math.random() * 50) + 15,
+    avgLessonsPerStudent: Math.floor(Math.random() * 8) + 1,
+  };
+}
+
+function randomParamsWithTeachers(overrides = {}) {
+  const teacherCount = Math.floor(Math.random() * 4) + 1; // 1–4
+  return {
+    ...randomParams(),
+    // Убираем старые поля уроков — новая модель использует teachers[]
+    lessons: undefined,
+    price: undefined,
+    teacherRate: undefined,
+    premLessons: undefined,
+    premPrice: undefined,
+    premTeacherRate: undefined,
+    teachers: Array.from({ length: teacherCount }, (_, idx) => randomTeacher(idx + 1)),
+    ...overrides,
+  };
+}
+
+describe("Инвариант: teacherCostTotal = сумма cost всех преподавателей из teachersList", () => {
+  test("выполняется при любом наборе teachers[]", () => {
+    for (let i = 0; i < RUNS; i++) {
+      const p = randomParamsWithTeachers();
+      const r = calculateModel(p);
+      const sumFromList = r.teachersList.reduce((s, t) => s + t.cost, 0);
+      expect(r.teacherCostTotal).toBe(sumFromList);
+    }
+  });
+});
+
+describe("Инвариант: totalRevenue >= 0 при пустом массиве преподавателей", () => {
+  test("0 преподавателей → totalRevenue >= 0", () => {
+    for (let i = 0; i < RUNS; i++) {
+      const p = {
+        ...randomParams(),
+        lessons: undefined,
+        price: undefined,
+        teacherRate: undefined,
+        premLessons: undefined,
+        premPrice: undefined,
+        premTeacherRate: undefined,
+        teachers: [],
+      };
+      const r = calculateModel(p);
+      expect(r.totalRevenue).toBeGreaterThanOrEqual(0);
     }
   });
 });
