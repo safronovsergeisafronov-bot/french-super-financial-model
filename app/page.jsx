@@ -1,6 +1,7 @@
 "use client";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { calculateModel } from "../lib/calculations.js";
+import { encodeStateToUrl, decodeStateFromUrl } from "../lib/urlState.js";
 
 const G = "#34d399";
 const R = "#f87171";
@@ -117,27 +118,224 @@ function ManagerCard({ data, fix, onFix, bonusPct, onBonusPct, kpi, onKpi }) {
   );
 }
 
+function TeacherCard({ teacher, onUpdate, onRemove, canRemove }) {
+  const revenue = teacher.lessonsPerMonth * teacher.pricePerLesson;
+  const cost = teacher.lessonsPerMonth * teacher.ratePerLesson;
+  const margin = revenue > 0 ? Math.round(((revenue - cost) / revenue) * 100) : 0;
+  const studentsEstimate = teacher.avgLessonsPerStudent > 0
+    ? Math.round(teacher.lessonsPerMonth / teacher.avgLessonsPerStudent)
+    : 0;
+
+  return (
+    <div style={{
+      background: "#0f1117", borderRadius: 8, padding: 12,
+      marginBottom: 8, border: "1px solid #2d3348",
+    }}>
+      <div style={{
+        display: "flex", justifyContent: "space-between",
+        alignItems: "center", marginBottom: 10,
+      }}>
+        <input
+          value={teacher.name}
+          onChange={e => onUpdate(teacher.id, "name", e.target.value)}
+          style={{
+            background: "transparent", border: "none", borderBottom: "1px solid #2d3348",
+            color: "#e2e8f0", fontSize: 13, fontWeight: 700, outline: "none",
+            width: "70%", paddingBottom: 2,
+          }}
+        />
+        {canRemove && (
+          <button
+            onClick={() => onRemove(teacher.id)}
+            style={{
+              background: "rgba(248,113,113,0.1)", border: "1px solid rgba(248,113,113,0.3)",
+              color: R, borderRadius: 5, padding: "2px 8px", fontSize: 10,
+              cursor: "pointer", fontWeight: 600,
+            }}
+          >
+            Удалить
+          </button>
+        )}
+      </div>
+
+      <Sl
+        label="Уроков/мес"
+        value={teacher.lessonsPerMonth}
+        onChange={v => onUpdate(teacher.id, "lessonsPerMonth", v)}
+        min={0} max={300}
+      />
+      <Sl
+        label="Цена урока для ученика"
+        value={teacher.pricePerLesson}
+        onChange={v => onUpdate(teacher.id, "pricePerLesson", v)}
+        min={15} max={80} unit="€"
+      />
+      <Sl
+        label="Ставка преподавателя"
+        value={teacher.ratePerLesson}
+        onChange={v => onUpdate(teacher.id, "ratePerLesson", v)}
+        min={5} max={40} unit="€"
+      />
+      <Sl
+        label="Уроков на ученика в мес"
+        value={teacher.avgLessonsPerStudent}
+        onChange={v => onUpdate(teacher.id, "avgLessonsPerStudent", v)}
+        min={1} max={20}
+      />
+
+      <Divider />
+
+      <Row label="Выручка" value={`€${revenue.toLocaleString()}`} color="#e2e8f0" />
+      <Row label="Себестоимость" value={`€${cost.toLocaleString()}`} color={R} />
+      <Row
+        label="Маржа"
+        value={`${margin}%`}
+        color={margin >= 50 ? G : "#94a3b8"}
+      />
+      <Row label="Учеников (оценка)" value={`${studentsEstimate}`} color={B} />
+
+      <Divider />
+
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+        <span style={{ fontSize: 11, color: DIM }}>
+          Итого выплата преподавателю
+        </span>
+        <span style={{ fontSize: 16, fontWeight: 700, color: "#fbbf24" }}>
+          €{cost.toLocaleString()}/мес
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function ProductCard({ product, computed, onUpdate, onRemove, canRemove }) {
+  const margin = computed?.margin ?? 0;
+  const isPhysical = product.unitCost > 0;
+
+  return (
+    <div style={{
+      background: "#0f1117", borderRadius: 8, padding: 12,
+      marginBottom: 8, border: "1px solid #2d3348",
+    }}>
+      <div style={{
+        display: "flex", justifyContent: "space-between",
+        alignItems: "center", marginBottom: 10,
+      }}>
+        <input
+          value={product.name}
+          onChange={e => onUpdate(product.id, "name", e.target.value)}
+          style={{
+            background: "transparent", border: "none", borderBottom: "1px solid #2d3348",
+            color: "#e2e8f0", fontSize: 13, fontWeight: 700, outline: "none",
+            width: "75%", paddingBottom: 2,
+          }}
+        />
+        {canRemove && (
+          <button
+            onClick={() => onRemove(product.id)}
+            style={{
+              background: "rgba(248,113,113,0.1)", border: "1px solid rgba(248,113,113,0.3)",
+              color: R, borderRadius: 5, padding: "2px 8px", fontSize: 10,
+              cursor: "pointer", fontWeight: 600,
+            }}
+          >
+            Удалить
+          </button>
+        )}
+      </div>
+
+      <Sl
+        label="Продано / мес"
+        value={product.unitsSoldPerMonth}
+        onChange={v => onUpdate(product.id, "unitsSoldPerMonth", v)}
+        min={0} max={100}
+      />
+      <Sl
+        label="Цена за единицу"
+        value={product.unitPrice}
+        onChange={v => onUpdate(product.id, "unitPrice", v)}
+        min={5} max={300} step={5} unit="€"
+      />
+      <Sl
+        label="Себестоимость (0 = цифровой)"
+        value={product.unitCost}
+        onChange={v => onUpdate(product.id, "unitCost", v)}
+        min={0} max={200} step={1} unit="€"
+      />
+
+      <Divider />
+
+      <Row label="Выручка" value={`€${(computed?.revenue ?? 0).toLocaleString()}`} color="#e2e8f0" />
+      {isPhysical && (
+        <Row label="Себестоимость" value={`€${(computed?.cost ?? 0).toLocaleString()}`} color={R} />
+      )}
+      <Row
+        label="Прибыль"
+        value={`€${(computed?.profit ?? 0).toLocaleString()}`}
+        color={margin >= 50 ? G : "#94a3b8"}
+        bold
+      />
+      <Row
+        label="Маржа"
+        value={`${margin}%`}
+        color={margin >= 70 ? G : margin >= 40 ? "#fbbf24" : "#94a3b8"}
+      />
+    </div>
+  );
+}
+
+function CopyLinkButton() {
+  const [copied, setCopied] = useState(false);
+  function handleCopy() {
+    navigator.clipboard.writeText(window.location.href).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
+  return (
+    <button onClick={handleCopy} style={{
+      background: copied ? "rgba(52,211,153,0.1)" : "rgba(79,140,255,0.08)",
+      border: `1px solid ${copied ? "rgba(52,211,153,0.3)" : "#2d3348"}`,
+      color: copied ? "#34d399" : "#6ba1ff",
+      borderRadius: 6, padding: "5px 12px",
+      fontSize: 11, fontWeight: 600, cursor: "pointer",
+    }}>
+      {copied ? "✓ Скопировано" : "⎘ Копировать ссылку"}
+    </button>
+  );
+}
+
 export default function App() {
   // Воронка
   const [leads, setLeads] = useState(5);
   const [conv, setConv] = useState(15);
   const [avgCheck, setAvgCheck] = useState(50);
 
-  // Уроки обычные
+  // Уроки обычные (сохранены для обратной совместимости с calculateModel)
   const [lessons, setLessons] = useState(40);
   const [price, setPrice] = useState(30);
   const [tRate, setTRate] = useState(10);
 
-  // Уроки премиум
+  // Уроки премиум (сохранены для обратной совместимости с calculateModel)
   const [premLessons, setPremLessons] = useState(0);
   const [premPrice, setPremPrice] = useState(45);
   const [premRate, setPremRate] = useState(15);
 
-  // Цифровые продукты
-  const [courses, setCourses] = useState(5);
-  const [courseP, setCourseP] = useState(70);
-  const [guides, setGuides] = useState(10);
-  const [guideP, setGuideP] = useState(20);
+  // Продукты (динамический список)
+  const [products, setProducts] = useState([
+    { id: "p1",  name: "Курс «Французский по карте города»", unitPrice: 70,  unitsSoldPerMonth: 5,  unitCost: 0  },
+    { id: "p2",  name: 'Книга "Жопарль"',                    unitPrice: 20,  unitsSoldPerMonth: 10, unitCost: 8  },
+    { id: "p3",  name: "DELF B1 (полный гайд)",              unitPrice: 40,  unitsSoldPerMonth: 3,  unitCost: 0  },
+    { id: "p4",  name: "DELF B1: Аудирование",               unitPrice: 12,  unitsSoldPerMonth: 5,  unitCost: 0  },
+    { id: "p5",  name: "DELF B1: Письменная речь",           unitPrice: 12,  unitsSoldPerMonth: 3,  unitCost: 0  },
+    { id: "p6",  name: "DELF B1: Чтение",                    unitPrice: 12,  unitsSoldPerMonth: 4,  unitCost: 0  },
+    { id: "p7",  name: "DELF B1: Устная речь",               unitPrice: 12,  unitsSoldPerMonth: 3,  unitCost: 0  },
+    { id: "p8",  name: "DELF B2 (полный гайд)",              unitPrice: 45,  unitsSoldPerMonth: 2,  unitCost: 0  },
+    { id: "p9",  name: "DELF B2: Аудирование",               unitPrice: 14,  unitsSoldPerMonth: 2,  unitCost: 0  },
+    { id: "p10", name: "DELF B2: Письменная речь",           unitPrice: 14,  unitsSoldPerMonth: 1,  unitCost: 0  },
+    { id: "p11", name: "DELF B2: Чтение",                    unitPrice: 14,  unitsSoldPerMonth: 2,  unitCost: 0  },
+    { id: "p12", name: "DELF B2: Устная речь",               unitPrice: 14,  unitsSoldPerMonth: 1,  unitCost: 0  },
+  ]);
 
   // Менеджеры
   const [managerCount, setManagerCount] = useState(2);
@@ -148,49 +346,131 @@ export default function App() {
   const [mgr2Bonus, setMgr2Bonus] = useState(7);
   const [mgr2Kpi, setMgr2Kpi] = useState(30);
 
+  // Преподаватели
+  const [teachers, setTeachers] = useState([
+    { id: "t1", name: "Преподаватель А", lessonsPerMonth: 40, pricePerLesson: 30, ratePerLesson: 10, avgLessonsPerStudent: 8 },
+  ]);
+
   // Прочее
   const [other, setOther] = useState(100);
+
+  // Загрузка состояния из URL при первом рендере
+  useEffect(() => {
+    const hash = window.location.hash.slice(1);
+    if (!hash) return;
+    const state = decodeStateFromUrl(hash);
+    if (!state) return;
+    if (state.leads != null) setLeads(state.leads);
+    if (state.conv != null) setConv(state.conv);
+    if (state.avgCheck != null) setAvgCheck(state.avgCheck);
+    if (state.lessons != null) setLessons(state.lessons);
+    if (state.price != null) setPrice(state.price);
+    if (state.tRate != null) setTRate(state.tRate);
+    if (state.premLessons != null) setPremLessons(state.premLessons);
+    if (state.premPrice != null) setPremPrice(state.premPrice);
+    if (state.premRate != null) setPremRate(state.premRate);
+    if (state.products != null) setProducts(state.products);
+    if (state.managerCount != null) setManagerCount(state.managerCount);
+    if (state.mgr1Fix != null) setMgr1Fix(state.mgr1Fix);
+    if (state.mgr1Bonus != null) setMgr1Bonus(state.mgr1Bonus);
+    if (state.mgr1Kpi != null) setMgr1Kpi(state.mgr1Kpi);
+    if (state.mgr2Fix != null) setMgr2Fix(state.mgr2Fix);
+    if (state.mgr2Bonus != null) setMgr2Bonus(state.mgr2Bonus);
+    if (state.mgr2Kpi != null) setMgr2Kpi(state.mgr2Kpi);
+    if (state.teachers != null) setTeachers(state.teachers);
+    if (state.other != null) setOther(state.other);
+  }, []);
+
+  const debounceTimer = useRef(null);
+  useEffect(() => {
+    if (debounceTimer.current) clearTimeout(debounceTimer.current);
+    debounceTimer.current = setTimeout(() => {
+      const encoded = encodeStateToUrl({
+        leads, conv, avgCheck, lessons, price, tRate,
+        premLessons, premPrice, premRate,
+        products, managerCount,
+        mgr1Fix, mgr1Bonus: mgr1Bonus, mgr1Kpi,
+        mgr2Fix, mgr2Bonus: mgr2Bonus, mgr2Kpi,
+        teachers, other,
+      });
+      window.location.hash = encoded;
+    }, 1000);
+    return () => { if (debounceTimer.current) clearTimeout(debounceTimer.current); };
+  }, [leads, conv, avgCheck, lessons, price, tRate, premLessons, premPrice, premRate,
+      products, managerCount, mgr1Fix, mgr1Bonus, mgr1Kpi, mgr2Fix, mgr2Bonus, mgr2Kpi,
+      teachers, other]);
+
+  function addTeacher() {
+    setTeachers(prev => [...prev, {
+      id: `t${Date.now()}`,
+      name: `Преподаватель ${String.fromCharCode(64 + prev.length + 1)}`,
+      lessonsPerMonth: 40, pricePerLesson: 30, ratePerLesson: 10, avgLessonsPerStudent: 8,
+    }]);
+  }
+
+  function removeTeacher(id) {
+    setTeachers(prev => prev.filter(t => t.id !== id));
+  }
+
+  function updateTeacher(id, field, value) {
+    setTeachers(prev => prev.map(t => t.id === id ? { ...t, [field]: value } : t));
+  }
+
+  function addProduct() {
+    setProducts(prev => [...prev, {
+      id: `p${Date.now()}`,
+      name: "Новый продукт",
+      unitPrice: 20,
+      unitsSoldPerMonth: 0,
+      unitCost: 0,
+    }]);
+  }
+
+  function removeProduct(id) {
+    setProducts(prev => prev.filter(p => p.id !== id));
+  }
+
+  function updateProduct(id, field, value) {
+    setProducts(prev => prev.map(p => p.id === id ? { ...p, [field]: value } : p));
+  }
 
   const m = useMemo(() => calculateModel({
     leads, conv, avgCheck,
     lessons, price, teacherRate: tRate,
     premLessons, premPrice, premTeacherRate: premRate,
-    courses, coursePrice: courseP,
-    guides, guidePrice: guideP,
     managerCount,
     mgr1Fix, mgr1BonusPct: mgr1Bonus, mgr1Kpi,
     mgr2Fix, mgr2BonusPct: mgr2Bonus, mgr2Kpi,
     otherCosts: other,
+    teachers,
+    products,
   }), [
     leads, conv, avgCheck,
     lessons, price, tRate,
     premLessons, premPrice, premRate,
-    courses, courseP, guides, guideP,
     managerCount, mgr1Fix, mgr1Bonus, mgr1Kpi, mgr2Fix, mgr2Bonus, mgr2Kpi,
     other,
+    teachers,
+    products,
   ]);
 
   const ok = m.isProfitable;
 
+  // Агрегаты по преподавателям (для отображения итогов)
+  const teachersCostTotal = teachers.reduce((sum, t) => sum + t.lessonsPerMonth * t.ratePerLesson, 0);
+  const teachersStudentsTotal = teachers.reduce((sum, t) =>
+    sum + (t.avgLessonsPerStudent > 0 ? Math.round(t.lessonsPerMonth / t.avgLessonsPerStudent) : 0), 0);
+
   const tbl = [
     {
-      name: `Уроки обычн. (${lessons})`,
+      name: `Инд. занятия (${teachers.reduce((s, t) => s + t.lessonsPerMonth, 0)} ур.)`,
       rev: m.lessonsRevenue, cost: m.lessonsCost,
       prof: m.lessonsProfit, mrg: m.lessonsMargin,
     },
-    ...(premLessons > 0 ? [{
-      name: `Уроки прем. (${premLessons})`,
-      rev: m.premRevenue, cost: m.premCost,
-      prof: m.premProfit, mrg: m.premMargin,
-    }] : []),
-    {
-      name: `Курсы (${courses})`,
-      rev: m.coursesRevenue, cost: 0, prof: m.coursesRevenue, mrg: 100,
-    },
-    {
-      name: `Гайды (${guides})`,
-      rev: m.guidesRevenue, cost: 0, prof: m.guidesRevenue, mrg: 100,
-    },
+    ...m.productsList.filter(p => p.unitsSoldPerMonth > 0).map(p => ({
+      name: `${p.name} (×${p.unitsSoldPerMonth})`,
+      rev: p.revenue, cost: p.cost, prof: p.profit, mrg: p.margin,
+    })),
   ];
 
   return (
@@ -199,9 +479,12 @@ export default function App() {
       fontFamily: "system-ui, sans-serif", color: "#e2e8f0",
     }}>
       <div style={{ maxWidth: 920, margin: "0 auto" }}>
-        <h1 style={{ fontSize: 20, fontWeight: 700, margin: "0 0 4px" }}>
-          French.Super — Финансовая модель
-        </h1>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 4 }}>
+          <h1 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>
+            French.Super — Финансовая модель
+          </h1>
+          <CopyLinkButton />
+        </div>
         <p style={{ fontSize: 12, color: DIM, margin: "0 0 16px" }}>
           Двигай ползунки — цифры мгновенно пересчитываются
         </p>
@@ -217,7 +500,7 @@ export default function App() {
             title="Расходы"
             value={`$${m.totalCost.toLocaleString()}`}
             color={R}
-            sub={`Менедж. $${m.managerCostTotal} | Преп. $${m.teacherCostTotal} | Др. $${other}`}
+            sub={`Менедж. $${m.managerCostTotal} | Преп. $${m.teacherCostTotal} | Др. $${other} | ${m.teachersStudentsTotal || teachersStudentsTotal} учеников`}
           />
           <Card
             title="Прибыль"
@@ -286,51 +569,40 @@ export default function App() {
               />
             </div>
 
-            {/* Уроки обычные */}
+            {/* Продукты */}
             <div style={panel}>
-              <div style={sTitle}>Уроки обычные</div>
-              <Sl label="Уроков/мес" value={lessons} onChange={setLessons} min={0} max={300} />
-              <Sl label="Цена урока" value={price} onChange={setPrice} min={15} max={60} unit="€" />
-              <Sl label="Ставка преподавателя" value={tRate} onChange={setTRate} min={5} max={25} unit="€" />
-              <Divider />
-              <Row label="Выручка" value={`$${m.lessonsRevenue}`} color="#e2e8f0" />
-              <Row
-                label="Маржа"
-                value={`${m.lessonsMargin}%`}
-                color={m.lessonsMargin >= 50 ? G : "#94a3b8"}
-              />
-            </div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                <div style={sTitle}>Продукты</div>
+                <span style={{ fontSize: 13, fontWeight: 700, color: G }}>
+                  €{m.productsRevenue.toLocaleString()}/мес
+                </span>
+              </div>
 
-            {/* Уроки премиум */}
-            <div style={panel}>
-              <div style={sTitle}>Уроки премиум</div>
-              <Sl label="Уроков/мес" value={premLessons} onChange={setPremLessons} min={0} max={200} />
-              <Sl label="Цена урока" value={premPrice} onChange={setPremPrice} min={25} max={80} unit="€" />
-              <Sl label="Ставка преподавателя" value={premRate} onChange={setPremRate} min={10} max={40} unit="€" />
-              {premLessons > 0 && (
-                <>
-                  <Divider />
-                  <Row label="Выручка" value={`$${m.premRevenue}`} color="#e2e8f0" />
-                  <Row
-                    label="Маржа"
-                    value={`${m.premMargin}%`}
-                    color={m.premMargin >= 50 ? G : "#94a3b8"}
+              {products.map(product => {
+                const computed = m.productsList.find(p => p.id === product.id);
+                return (
+                  <ProductCard
+                    key={product.id}
+                    product={product}
+                    computed={computed}
+                    onUpdate={updateProduct}
+                    onRemove={removeProduct}
+                    canRemove={products.length > 1}
                   />
-                </>
-              )}
-            </div>
+                );
+              })}
 
-            {/* Цифровые продукты */}
-            <div style={panel}>
-              <div style={sTitle}>Цифровые продукты</div>
-              <Sl label="Курсов продано/мес" value={courses} onChange={setCourses} min={0} max={50} />
-              <Sl label="Средний чек курса" value={courseP} onChange={setCourseP} min={20} max={200} unit="$" />
-              <Sl label="Гайдов продано/мес" value={guides} onChange={setGuides} min={0} max={100} />
-              <Sl label="Средний чек гайда" value={guideP} onChange={setGuideP} min={10} max={50} unit="$" />
-              <Divider />
-              <Row label="Выручка курсы" value={`$${m.coursesRevenue}`} color="#e2e8f0" />
-              <Row label="Выручка гайды" value={`$${m.guidesRevenue}`} color="#e2e8f0" />
-              <Row label="Маржа цифровых продуктов" value="100%" color={G} />
+              <button
+                onClick={addProduct}
+                style={{
+                  width: "100%", padding: "7px 0", borderRadius: 6,
+                  cursor: "pointer", border: "1px solid #2d3348", fontSize: 11,
+                  fontWeight: 600, background: "#0f1117", color: DIM,
+                  marginTop: 4,
+                }}
+              >
+                + Добавить продукт
+              </button>
             </div>
           </div>
 
@@ -395,27 +667,39 @@ export default function App() {
             {/* Преподаватели */}
             <div style={panel}>
               <div style={sTitle}>Преподаватели</div>
-              <Row
-                label={`Обычные (${lessons} × €${tRate})`}
-                value={`$${m.lessonsCost}`}
-                color="#e2e8f0"
-              />
-              {premLessons > 0 && (
-                <Row
-                  label={`Премиум (${premLessons} × €${premRate})`}
-                  value={`$${m.premCost}`}
-                  color="#e2e8f0"
+
+              {teachers.map(teacher => (
+                <TeacherCard
+                  key={teacher.id}
+                  teacher={teacher}
+                  onUpdate={updateTeacher}
+                  onRemove={removeTeacher}
+                  canRemove={teachers.length > 1}
                 />
-              )}
+              ))}
+
+              {/* Кнопка добавления */}
+              <button
+                onClick={addTeacher}
+                style={{
+                  width: "100%", padding: "7px 0", borderRadius: 6,
+                  cursor: "pointer", border: "1px solid #2d3348", fontSize: 11,
+                  fontWeight: 600, background: "#0f1117", color: DIM,
+                  marginTop: 4,
+                }}
+              >
+                + Добавить преподавателя
+              </button>
+
               <Divider />
-              <div style={{ display: "flex", justifyContent: "space-between" }}>
-                <span style={{ fontSize: 12, color: DIM }}>Итого</span>
-                <span style={{ fontSize: 14, fontWeight: 700, color: "#fbbf24" }}>
-                  ${m.teacherCostTotal.toLocaleString()}/мес
+
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                <span style={{ fontSize: 12, color: DIM }}>
+                  Итого ({teachersStudentsTotal} учеников)
                 </span>
-              </div>
-              <div style={{ fontSize: 10, color: DIM, marginTop: 4 }}>
-                Только за проведённые уроки, фикс отсутствует
+                <span style={{ fontSize: 14, fontWeight: 700, color: "#fbbf24" }}>
+                  €{teachersCostTotal.toLocaleString()}/мес
+                </span>
               </div>
             </div>
 
