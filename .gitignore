@@ -1,0 +1,20 @@
+# dependencies
+node_modules/
+/.pnp
+.pnp.js
+
+# production
+/.next/
+/out/
+
+# misc
+.DS_Store
+*.pem
+.env*
+!.env.example
+
+# debug
+npm-debug.log*
+
+# vercel
+.vercel
