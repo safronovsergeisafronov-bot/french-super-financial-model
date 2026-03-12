@@ -2,6 +2,7 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import { calculateModel } from "../lib/calculations.js";
 import { encodeStateToUrl, decodeStateFromUrl } from "../lib/urlState.js";
+import { createClient } from "../lib/supabase.js";
 
 const G = "#34d399";
 const R = "#f87171";
@@ -305,6 +306,61 @@ function CopyLinkButton() {
   );
 }
 
+function AuthPanel({ user, onLogout }) {
+  const [email, setEmail] = useState("");
+  const [sent, setSent] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const supabase = createClient();
+
+  async function handleLogin(e) {
+    e.preventDefault();
+    setLoading(true);
+    await supabase.auth.signInWithOtp({
+      email,
+      options: { emailRedirectTo: window.location.origin },
+    });
+    setLoading(false);
+    setSent(true);
+  }
+
+  if (user) {
+    return (
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <span style={{ fontSize: 11, color: "#34d399" }}>✓ {user.email}</span>
+        <button onClick={onLogout} style={{
+          background: "transparent", border: "1px solid #2d3348",
+          color: DIM, borderRadius: 6, padding: "3px 8px",
+          fontSize: 11, cursor: "pointer",
+        }}>Выйти</button>
+      </div>
+    );
+  }
+
+  if (sent) {
+    return <span style={{ fontSize: 11, color: "#34d399" }}>✓ Ссылка отправлена на {email}</span>;
+  }
+
+  return (
+    <form onSubmit={handleLogin} style={{ display: "flex", gap: 6, alignItems: "center" }}>
+      <input
+        type="email" required placeholder="Email для входа" value={email}
+        onChange={e => setEmail(e.target.value)}
+        style={{
+          background: "#1a1d27", border: "1px solid #2d3348", color: "#e2e8f0",
+          borderRadius: 6, padding: "4px 10px", fontSize: 11, outline: "none", width: 180,
+        }}
+      />
+      <button type="submit" disabled={loading} style={{
+        background: "rgba(79,140,255,0.15)", border: "1px solid #2d3348",
+        color: "#6ba1ff", borderRadius: 6, padding: "4px 12px",
+        fontSize: 11, fontWeight: 600, cursor: "pointer",
+      }}>
+        {loading ? "..." : "Войти"}
+      </button>
+    </form>
+  );
+}
+
 export default function App() {
   // Воронка
   const [leads, setLeads] = useState(5);
@@ -354,51 +410,86 @@ export default function App() {
   // Прочее
   const [other, setOther] = useState(100);
 
-  // Загрузка состояния из URL при первом рендере
+  // Авторизация
+  const [user, setUser] = useState(null);
+  const [authReady, setAuthReady] = useState(false);
+  const supabase = createClient();
+
+  function applyState(s) {
+    if (s.leads != null) setLeads(s.leads);
+    if (s.conv != null) setConv(s.conv);
+    if (s.avgCheck != null) setAvgCheck(s.avgCheck);
+    if (s.lessons != null) setLessons(s.lessons);
+    if (s.price != null) setPrice(s.price);
+    if (s.tRate != null) setTRate(s.tRate);
+    if (s.premLessons != null) setPremLessons(s.premLessons);
+    if (s.premPrice != null) setPremPrice(s.premPrice);
+    if (s.premRate != null) setPremRate(s.premRate);
+    if (s.products != null) setProducts(s.products);
+    if (s.managerCount != null) setManagerCount(s.managerCount);
+    if (s.mgr1Fix != null) setMgr1Fix(s.mgr1Fix);
+    if (s.mgr1Bonus != null) setMgr1Bonus(s.mgr1Bonus);
+    if (s.mgr1Kpi != null) setMgr1Kpi(s.mgr1Kpi);
+    if (s.mgr2Fix != null) setMgr2Fix(s.mgr2Fix);
+    if (s.mgr2Bonus != null) setMgr2Bonus(s.mgr2Bonus);
+    if (s.mgr2Kpi != null) setMgr2Kpi(s.mgr2Kpi);
+    if (s.teachers != null) setTeachers(s.teachers);
+    if (s.other != null) setOther(s.other);
+  }
+
+  // Следим за сессией
   useEffect(() => {
-    const hash = window.location.hash.slice(1);
-    if (!hash) return;
-    const state = decodeStateFromUrl(hash);
-    if (!state) return;
-    if (state.leads != null) setLeads(state.leads);
-    if (state.conv != null) setConv(state.conv);
-    if (state.avgCheck != null) setAvgCheck(state.avgCheck);
-    if (state.lessons != null) setLessons(state.lessons);
-    if (state.price != null) setPrice(state.price);
-    if (state.tRate != null) setTRate(state.tRate);
-    if (state.premLessons != null) setPremLessons(state.premLessons);
-    if (state.premPrice != null) setPremPrice(state.premPrice);
-    if (state.premRate != null) setPremRate(state.premRate);
-    if (state.products != null) setProducts(state.products);
-    if (state.managerCount != null) setManagerCount(state.managerCount);
-    if (state.mgr1Fix != null) setMgr1Fix(state.mgr1Fix);
-    if (state.mgr1Bonus != null) setMgr1Bonus(state.mgr1Bonus);
-    if (state.mgr1Kpi != null) setMgr1Kpi(state.mgr1Kpi);
-    if (state.mgr2Fix != null) setMgr2Fix(state.mgr2Fix);
-    if (state.mgr2Bonus != null) setMgr2Bonus(state.mgr2Bonus);
-    if (state.mgr2Kpi != null) setMgr2Kpi(state.mgr2Kpi);
-    if (state.teachers != null) setTeachers(state.teachers);
-    if (state.other != null) setOther(state.other);
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+      setAuthReady(true);
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+    return () => subscription.unsubscribe();
   }, []);
 
+  // Загрузка состояния: из Supabase если залогинен, иначе из URL
+  useEffect(() => {
+    if (!authReady) return;
+    if (user) {
+      supabase.from("model_state").select("state").eq("user_id", user.id).single()
+        .then(({ data }) => { if (data?.state) applyState(data.state); });
+    } else {
+      const hash = window.location.hash.slice(1);
+      if (!hash) return;
+      const state = decodeStateFromUrl(hash);
+      if (state) applyState(state);
+    }
+  }, [authReady, user]);
+
+  // Автосохранение: в Supabase если залогинен, иначе в URL
   const debounceTimer = useRef(null);
   useEffect(() => {
+    if (!authReady) return;
     if (debounceTimer.current) clearTimeout(debounceTimer.current);
     debounceTimer.current = setTimeout(() => {
-      const encoded = encodeStateToUrl({
+      const state = {
         leads, conv, avgCheck, lessons, price, tRate,
         premLessons, premPrice, premRate,
         products, managerCount,
-        mgr1Fix, mgr1Bonus: mgr1Bonus, mgr1Kpi,
-        mgr2Fix, mgr2Bonus: mgr2Bonus, mgr2Kpi,
+        mgr1Fix, mgr1Bonus, mgr1Kpi,
+        mgr2Fix, mgr2Bonus, mgr2Kpi,
         teachers, other,
-      });
-      window.location.hash = encoded;
+      };
+      if (user) {
+        supabase.from("model_state").upsert(
+          { user_id: user.id, state, updated_at: new Date().toISOString() },
+          { onConflict: "user_id" }
+        );
+      } else {
+        window.location.hash = encodeStateToUrl(state);
+      }
     }, 1000);
     return () => { if (debounceTimer.current) clearTimeout(debounceTimer.current); };
   }, [leads, conv, avgCheck, lessons, price, tRate, premLessons, premPrice, premRate,
       products, managerCount, mgr1Fix, mgr1Bonus, mgr1Kpi, mgr2Fix, mgr2Bonus, mgr2Kpi,
-      teachers, other]);
+      teachers, other, user, authReady]);
 
   function addTeacher() {
     setTeachers(prev => [...prev, {
@@ -479,14 +570,17 @@ export default function App() {
       fontFamily: "system-ui, sans-serif", color: "#e2e8f0",
     }}>
       <div style={{ maxWidth: 920, margin: "0 auto" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 4 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4, flexWrap: "wrap", gap: 8 }}>
           <h1 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>
             French.Super — Финансовая модель
           </h1>
-          <CopyLinkButton />
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <AuthPanel user={user} onLogout={() => supabase.auth.signOut()} />
+            {!user && <CopyLinkButton />}
+          </div>
         </div>
         <p style={{ fontSize: 12, color: DIM, margin: "0 0 16px" }}>
-          Двигай ползунки — цифры мгновенно пересчитываются
+          {user ? "Данные сохраняются автоматически" : "Войдите чтобы сохранять данные между устройствами"}
         </p>
 
         {/* ── Summary cards ── */}
