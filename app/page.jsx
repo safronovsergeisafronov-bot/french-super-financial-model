@@ -168,13 +168,13 @@ function TeacherCard({ teacher, onUpdate, onRemove, canRemove }) {
         label="Цена урока для ученика"
         value={teacher.pricePerLesson}
         onChange={v => onUpdate(teacher.id, "pricePerLesson", v)}
-        min={15} max={80} unit="€"
+        min={15} max={80} unit="$"
       />
       <Sl
         label="Ставка преподавателя"
         value={teacher.ratePerLesson}
         onChange={v => onUpdate(teacher.id, "ratePerLesson", v)}
-        min={5} max={40} unit="€"
+        min={5} max={40} unit="$"
       />
       <Sl
         label="Уроков на ученика в мес"
@@ -185,8 +185,8 @@ function TeacherCard({ teacher, onUpdate, onRemove, canRemove }) {
 
       <Divider />
 
-      <Row label="Выручка" value={`€${revenue.toLocaleString()}`} color="#e2e8f0" />
-      <Row label="Себестоимость" value={`€${cost.toLocaleString()}`} color={R} />
+      <Row label="Выручка" value={`$${revenue.toLocaleString()}`} color="#e2e8f0" />
+      <Row label="Себестоимость" value={`$${cost.toLocaleString()}`} color={R} />
       <Row
         label="Маржа"
         value={`${margin}%`}
@@ -201,7 +201,7 @@ function TeacherCard({ teacher, onUpdate, onRemove, canRemove }) {
           Итого выплата преподавателю
         </span>
         <span style={{ fontSize: 16, fontWeight: 700, color: "#fbbf24" }}>
-          €{cost.toLocaleString()}/мес
+          ${cost.toLocaleString()}/мес
         </span>
       </div>
     </div>
@@ -254,24 +254,24 @@ function ProductCard({ product, computed, onUpdate, onRemove, canRemove }) {
         label="Цена за единицу"
         value={product.unitPrice}
         onChange={v => onUpdate(product.id, "unitPrice", v)}
-        min={5} max={300} step={5} unit="€"
+        min={5} max={300} step={5} unit="$"
       />
       <Sl
         label="Себестоимость (0 = цифровой)"
         value={product.unitCost}
         onChange={v => onUpdate(product.id, "unitCost", v)}
-        min={0} max={200} step={1} unit="€"
+        min={0} max={200} step={1} unit="$"
       />
 
       <Divider />
 
-      <Row label="Выручка" value={`€${(computed?.revenue ?? 0).toLocaleString()}`} color="#e2e8f0" />
+      <Row label="Выручка" value={`$${(computed?.revenue ?? 0).toLocaleString()}`} color="#e2e8f0" />
       {isPhysical && (
-        <Row label="Себестоимость" value={`€${(computed?.cost ?? 0).toLocaleString()}`} color={R} />
+        <Row label="Себестоимость" value={`$${(computed?.cost ?? 0).toLocaleString()}`} color={R} />
       )}
       <Row
         label="Прибыль"
-        value={`€${(computed?.profit ?? 0).toLocaleString()}`}
+        value={`$${(computed?.profit ?? 0).toLocaleString()}`}
         color={margin >= 50 ? G : "#94a3b8"}
         bold
       />
@@ -574,7 +574,7 @@ export default function App() {
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
                 <div style={sTitle}>Продукты</div>
                 <span style={{ fontSize: 13, fontWeight: 700, color: G }}>
-                  €{m.productsRevenue.toLocaleString()}/мес
+                  ${m.productsRevenue.toLocaleString()}/мес
                 </span>
               </div>
 
@@ -698,7 +698,7 @@ export default function App() {
                   Итого ({teachersStudentsTotal} учеников)
                 </span>
                 <span style={{ fontSize: 14, fontWeight: 700, color: "#fbbf24" }}>
-                  €{teachersCostTotal.toLocaleString()}/мес
+                  ${teachersCostTotal.toLocaleString()}/мес
                 </span>
               </div>
             </div>
